@@ -283,7 +283,19 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    host = os.environ.get("LISTEN_HOST", "127.0.0.1")
+    configured_hosts = os.environ.get("LISTEN_HOSTS")
+    if configured_hosts:
+        hosts = [host.strip() for host in configured_hosts.split(",") if host.strip()]
+    else:
+        hosts = [os.environ.get("LISTEN_HOST", "127.0.0.1")]
+    if not hosts:
+        raise SystemExit("at least one listen host is required")
     port = int(os.environ.get("LISTEN_PORT", "8000"))
-    print(f"Listening on http://{host}:{port}; printer={DEVICE}", flush=True)
-    ThreadingHTTPServer((host, port), Handler).serve_forever()
+    servers = [ThreadingHTTPServer((host, port), Handler) for host in hosts]
+    print(
+        f"Listening on {', '.join(f'http://{host}:{port}' for host in hosts)}; printer={DEVICE}",
+        flush=True,
+    )
+    for server in servers[:-1]:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    servers[-1].serve_forever()

@@ -67,6 +67,16 @@ For access over Tailscale, set `LISTEN_HOST` to the machine's Tailscale IP. Do
 not bind to an untrusted network without configuring `PRINTER_API_TOKEN` or
 another authentication layer.
 
+To listen on an exact LAN address and a Tailscale address at the same time, use
+the comma-separated `LISTEN_HOSTS` setting instead of `LISTEN_HOST`:
+
+```ini
+LISTEN_HOSTS=192.168.1.20,100.64.0.10
+```
+
+Binding exact addresses avoids unintentionally exposing the API on Docker or
+other local interfaces.
+
 Enable the service:
 
 ```bash
