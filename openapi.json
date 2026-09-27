@@ -3,7 +3,7 @@
   "info": {
     "title": "Star TSP743II Printer API",
     "version": "1.2.0",
-    "description": "REST API for text, image, and raw Star Line Mode printing over USB. The service is intended for trusted clients on the tailnet."
+    "description": "REST API for text, image, and raw Star Line Mode printing over USB. The service is intended for trusted networks."
   },
   "servers": [
     {
