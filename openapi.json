@@ -1,0 +1,336 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Star TSP743II Printer API",
+    "version": "1.2.0",
+    "description": "REST API for text, image, and raw Star Line Mode printing over USB. The service is intended for trusted clients on the tailnet."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Same origin as the Web UI"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Open the printer Web UI",
+        "operationId": "getWebUi",
+        "responses": {
+          "200": {
+            "description": "HTML printer interface",
+            "content": {
+              "text/html": {
+                "schema": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Check API and printer device health",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Printer device is writable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "Get this OpenAPI specification",
+        "operationId": "getOpenApi",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/print/text": {
+      "post": {
+        "summary": "Print text",
+        "operationId": "printText",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextPrintRequest"
+              },
+              "example": {
+                "text": "注文番号: 123\\nありがとうございました",
+                "feed": 3,
+                "cut": "partial",
+                "left_margin": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Print data accepted by the USB device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/print/image": {
+      "post": {
+        "summary": "Convert and print a color image",
+        "description": "Resizes the image while preserving aspect ratio, enhances grayscale contrast, applies dithering, converts it to Star raster data, and lets the printer feed and cut at EOT.",
+        "operationId": "printImage",
+        "parameters": [
+          {
+            "name": "width",
+            "in": "query",
+            "description": "Output width in dots; must be divisible by 8",
+            "schema": {
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 640,
+              "multipleOf": 8,
+              "default": 608
+            }
+          },
+          {
+            "name": "left_margin",
+            "in": "query",
+            "description": "Left margin in 8-dot units",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20,
+              "default": 2
+            }
+          },
+          {
+            "name": "dither",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["floyd-steinberg", "threshold"],
+              "default": "floyd-steinberg"
+            }
+          },
+          {
+            "name": "cut",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["none", "full", "partial"],
+              "default": "partial"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "contentEncoding": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "contentEncoding": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "contentEncoding": "binary"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImagePrintRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Converted raster data accepted by the USB device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImagePrintResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/print/raw": {
+      "post": {
+        "summary": "Print raw Star command bytes",
+        "operationId": "printRaw",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RawPrintRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Raw data accepted by the USB device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "required": ["ok", "printer", "device", "writable"],
+        "properties": {
+          "ok": {"type": "boolean"},
+          "printer": {"type": "string"},
+          "device": {"type": "string"},
+          "writable": {"type": "boolean"}
+        }
+      },
+      "TextPrintRequest": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": {"type": "string", "minLength": 1},
+          "encoding": {"type": "string", "default": "cp932"},
+          "feed": {"type": "integer", "minimum": 0, "maximum": 20, "default": 3},
+          "cut": {"type": "string", "enum": ["none", "full", "partial"], "default": "partial"},
+          "left_margin": {"type": "integer", "minimum": 0, "maximum": 20, "default": 1}
+        }
+      },
+      "ImagePrintRequest": {
+        "type": "object",
+        "required": ["base64"],
+        "properties": {
+          "base64": {"type": "string", "contentEncoding": "base64"},
+          "width": {"type": "integer", "minimum": 8, "maximum": 640, "multipleOf": 8, "default": 608},
+          "left_margin": {"type": "integer", "minimum": 0, "maximum": 20, "default": 2},
+          "dither": {"type": "string", "enum": ["floyd-steinberg", "threshold"], "default": "floyd-steinberg"},
+          "cut": {"type": "string", "enum": ["none", "full", "partial"], "default": "partial"}
+        }
+      },
+      "RawPrintRequest": {
+        "type": "object",
+        "required": ["base64"],
+        "properties": {
+          "base64": {"type": "string", "contentEncoding": "base64"}
+        }
+      },
+      "PrintResponse": {
+        "type": "object",
+        "required": ["ok", "bytes"],
+        "properties": {
+          "ok": {"type": "boolean", "const": true},
+          "bytes": {"type": "integer", "minimum": 1},
+          "cut": {"type": "string"},
+          "left_margin": {"type": "integer"}
+        }
+      },
+      "ImagePrintResponse": {
+        "allOf": [
+          {"$ref": "#/components/schemas/PrintResponse"},
+          {
+            "type": "object",
+            "required": ["width", "height", "dither", "cut", "left_margin"],
+            "properties": {
+              "width": {"type": "integer"},
+              "height": {"type": "integer"},
+              "dither": {"type": "string"},
+              "cut": {"type": "string"},
+              "left_margin": {"type": "integer"}
+            }
+          }
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["ok", "error"],
+        "properties": {
+          "ok": {"type": "boolean", "const": false},
+          "error": {"type": "string"}
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Printer or service dependency unavailable",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Star Printer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18201f;
+      --muted: #66706d;
+      --paper: #fffdf7;
+      --surface: rgba(255, 255, 255, .86);
+      --line: #d9ddd7;
+      --green: #176b50;
+      --green-dark: #0e4f3a;
+      --red: #a43c35;
+      --shadow: 0 18px 50px rgba(20, 35, 30, .12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: ui-rounded, "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(83, 169, 132, .18), transparent 32rem),
+        linear-gradient(145deg, #eef3ed, #f8f4e9 65%, #ece7d8);
+    }
+    .shell { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 42px 0 64px; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+    h1 { margin: 0; font-size: clamp(30px, 5vw, 50px); letter-spacing: -.04em; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); }
+    .status {
+      display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px;
+      border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+      font-size: 14px; white-space: nowrap;
+    }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #aaa; box-shadow: 0 0 0 4px rgba(0,0,0,.05); }
+    .status.ready .dot { background: #29a370; box-shadow: 0 0 0 4px rgba(41,163,112,.14); }
+    .status.error .dot { background: var(--red); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card {
+      border: 1px solid rgba(188, 196, 188, .8); border-radius: 22px; padding: 24px;
+      background: var(--surface); backdrop-filter: blur(12px); box-shadow: var(--shadow);
+    }
+    .card h2 { margin: 0 0 6px; font-size: 21px; }
+    .hint { margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    label { display: block; margin: 14px 0 7px; font-size: 13px; font-weight: 700; }
+    textarea, input, select, button { font: inherit; }
+    textarea, input[type="number"], select, .dropzone {
+      width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink);
+    }
+    textarea { min-height: 180px; padding: 14px; resize: vertical; line-height: 1.65; }
+    input[type="number"], select { height: 42px; padding: 0 11px; }
+    .settings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .dropzone { position: relative; display: grid; place-items: center; min-height: 180px; overflow: hidden; cursor: pointer; }
+    .dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .dropzone img { display: none; width: 100%; max-height: 260px; object-fit: contain; background: white; }
+    .dropzone.has-image img { display: block; }
+    .dropzone.has-image .drop-copy { display: none; }
+    .drop-copy { text-align: center; color: var(--muted); padding: 28px; }
+    .drop-copy strong { display: block; color: var(--ink); margin-bottom: 6px; }
+    button {
+      width: 100%; margin-top: 18px; padding: 13px 18px; border: 0; border-radius: 13px;
+      background: var(--green); color: white; font-weight: 800; cursor: pointer;
+      box-shadow: 0 8px 20px rgba(23,107,80,.22); transition: transform .15s, background .15s;
+    }
+    button:hover { background: var(--green-dark); transform: translateY(-1px); }
+    button:disabled { opacity: .55; cursor: wait; transform: none; }
+    .output { grid-column: 1 / -1; }
+    pre {
+      margin: 12px 0 0; min-height: 88px; padding: 16px; overflow: auto;
+      border-radius: 13px; color: #d9f9e9; background: #12201b; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .links { display: flex; gap: 14px; margin-top: 12px; font-size: 13px; }
+    a { color: var(--green-dark); }
+    @media (max-width: 760px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .grid { grid-template-columns: 1fr; }
+      .settings { grid-template-columns: 1fr 1fr; }
+      .output { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>Star Printer</h1>
+        <p class="subtitle">TSP743II · USB · 80 mm</p>
+      </div>
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">確認中…</span></div>
+    </header>
+
+    <section class="grid">
+      <form class="card" id="textForm">
+        <h2>テキスト印刷</h2>
+        <p class="hint">日本語はCP932へ変換します。</p>
+        <label for="text">印刷内容</label>
+        <textarea id="text" required placeholder="ここに印刷する文字を入力"></textarea>
+        <div class="settings">
+          <div><label for="feed">紙送り</label><input id="feed" type="number" min="0" max="20" value="3"></div>
+          <div><label for="textMargin">左余白</label><input id="textMargin" type="number" min="0" max="20" value="1"></div>
+          <div><label for="textCut">カット</label><select id="textCut"><option value="partial">部分</option><option value="full">全</option><option value="none">なし</option></select></div>
+        </div>
+        <button type="submit">テキストを印刷</button>
+      </form>
+
+      <form class="card" id="imageForm">
+        <h2>画像印刷</h2>
+        <p class="hint">カラー画像をAPI側で白黒ディザリングします。</p>
+        <label for="image">JPEG / PNG / WebP</label>
+        <div class="dropzone" id="dropzone">
+          <input id="image" type="file" accept="image/jpeg,image/png,image/webp" required>
+          <img id="preview" alt="選択画像のプレビュー">
+          <div class="drop-copy"><strong>画像を選択</strong>クリックまたはドロップ</div>
+        </div>
+        <div class="settings">
+          <div><label for="width">幅</label><select id="width"><option value="608">608 dots</option><option value="576">576 dots</option><option value="640">640 dots</option></select></div>
+          <div><label for="imageMargin">左余白</label><input id="imageMargin" type="number" min="0" max="20" value="2"></div>
+          <div><label for="dither">変換</label><select id="dither"><option value="floyd-steinberg">Floyd–Steinberg</option><option value="threshold">二値化</option></select></div>
+        </div>
+        <button type="submit">画像を印刷</button>
+      </form>
+
+      <section class="card output">
+        <h2>APIレスポンス</h2>
+        <pre id="output">準備完了</pre>
+        <div class="links"><a href="/openapi.json" target="_blank">OpenAPI</a><a href="/health" target="_blank">Health</a></div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const output = document.querySelector('#output');
+    const status = document.querySelector('#status');
+    const statusText = document.querySelector('#statusText');
+    const imageInput = document.querySelector('#image');
+    const preview = document.querySelector('#preview');
+    const dropzone = document.querySelector('#dropzone');
+
+    function show(data) {
+      output.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    }
+
+    async function readResponse(response) {
+      const data = await response.json().catch(() => ({ ok: false, error: `HTTP ${response.status}` }));
+      show(data);
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      return data;
+    }
+
+    async function refreshHealth() {
+      try {
+        const response = await fetch('/health');
+        const data = await response.json();
+        status.className = `status ${data.ok ? 'ready' : 'error'}`;
+        statusText.textContent = data.ok ? 'プリンタ接続済み' : 'プリンタ未接続';
+      } catch (_) {
+        status.className = 'status error';
+        statusText.textContent = 'API接続エラー';
+      }
+    }
+
+    document.querySelector('#textForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = event.submitter;
+      button.disabled = true;
+      try {
+        const response = await fetch('/print/text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: document.querySelector('#text').value,
+            feed: Number(document.querySelector('#feed').value),
+            left_margin: Number(document.querySelector('#textMargin').value),
+            cut: document.querySelector('#textCut').value
+          })
+        });
+        await readResponse(response);
+      } catch (error) { show({ ok: false, error: error.message }); }
+      finally { button.disabled = false; refreshHealth(); }
+    });
+
+    imageInput.addEventListener('change', () => {
+      const file = imageInput.files[0];
+      if (!file) return;
+      preview.src = URL.createObjectURL(file);
+      dropzone.classList.add('has-image');
+    });
+
+    document.querySelector('#width').addEventListener('change', event => {
+      const margin = document.querySelector('#imageMargin');
+      const maxMargin = (640 - Number(event.target.value)) / 8;
+      margin.max = String(maxMargin);
+      if (Number(margin.value) > maxMargin) margin.value = String(maxMargin);
+    });
+
+    document.querySelector('#imageForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const file = imageInput.files[0];
+      if (!file) return;
+      const button = event.submitter;
+      button.disabled = true;
+      const query = new URLSearchParams({
+        width: document.querySelector('#width').value,
+        left_margin: document.querySelector('#imageMargin').value,
+        dither: document.querySelector('#dither').value,
+        cut: 'partial'
+      });
+      try {
+        const response = await fetch(`/print/image?${query}`, {
+          method: 'POST', headers: { 'Content-Type': file.type }, body: file
+        });
+        await readResponse(response);
+      } catch (error) { show({ ok: false, error: error.message }); }
+      finally { button.disabled = false; refreshHealth(); }
+    });
+
+    refreshHealth();
+    setInterval(refreshHealth, 15000);
+  </script>
+</body>
+</html>
